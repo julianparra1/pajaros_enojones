@@ -3,36 +3,34 @@
 #include <math.h>
 #include <stdio.h>
 
-#define MAX_SKY_RECTANGLES 10
-#define SKY_RECTANGLE_WIDTH 200
-
 //------------------------------------------------------------------------------------
-// Program main entry point
+// Pajaros Enojones
 //------------------------------------------------------------------------------------
 int main(void) {
-  // Initialization
+  // Inicializacion
   //--------------------------------------------------------------------------------------
-  const int screenWidth = 800;
-  const int screenHeight = 450;
+  const int anchoPantalla = 1080;
+  const int alturaPantalla = 720;
 
   SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
-  InitWindow(screenWidth, screenHeight, "PAJAROS ENOJONES");
+  InitWindow(anchoPantalla, alturaPantalla, "PAJAROS ENOJONES");
 
-  float Xpos = 0.0;                      // Posicion de la bola en X
-  float Ypos = (float)GetScreenHeight(); // Posicion de la bola en Y
+  float X_pelota = 0.0; // Posicion de la bola en X
+  float Y_pelota = 0.0; // Posicion de la bola en Y
 
-  float Vy = 0;
-  float Vx = 0;
-  float Vi = 50; // Velocidad inicial
+  float Vy = 0.0; // Velocidad de la pelota en Y
+  float Vx = 0.0; // Velocidad de la pelota en X
 
-  float theta = PI / 4; // Angulo de tiro
+  float Vi = 0.0; // Velocidad inicial
 
-  bool pause = false;      // Bandera de pausa
-  bool disparando = false; // DISAPROOOOOOOO
+  float theta = 0; // Angulo de tiro
 
-  Vector2 posInicial;
-  Vector2 posFinal;
-  Vector2 deltaPos = {0, 0};
+  Vector2 p1 = {0, 0};       // Punto Inicial (click)
+  Vector2 p2 = {0, 0};       // Punto final (release del click)
+  Vector2 deltaPos = {0, 0}; // El vector creado por estos dos puntos
+
+  bool pausa = false;      // Pausado?
+  bool disparando = false; // Se presiono click?
   //--------------------------------------------------------------------------------------
   // Juego
   while (!WindowShouldClose()) {
@@ -40,34 +38,54 @@ int main(void) {
     //----------------------------------------------------------------------------------
 
     if (IsKeyDown(KEY_SPACE))
-      pause = !pause;
+      pausa = !pausa;
 
-    if (!pause) {
-      Xpos += Vx; // y = y_0 + dt*Vy
-      Ypos += Vy; // x = x_0 + dt*Vx_0
+    if (!pausa) {
+      X_pelota += Vx; // y = y_0 + dt*Vy
+      Y_pelota += Vy; // x = x_0 + dt*Vx_0
     }
 
-    Vy += 9.8 * GetFrameTime(); // + y''*dt para Vy
+    if (X_pelota > GetScreenWidth() || X_pelota < 0) {
+      // TODO: FUNCION DE ZERO-TODO
+      X_pelota = 0;
+      Y_pelota = 0;
+      deltaPos.x = 0;
+      deltaPos.y = 0;
+      pausa = !pausa;
+    }
+    if (Y_pelota > GetScreenHeight()) {
+      X_pelota = 0;
+      Y_pelota = 0;
+      deltaPos.x = 0;
+      deltaPos.y = 0;
+
+      pausa = !pausa;
+    }
+    Vy += 9.8 * 0.01; // + y''*dt para Vy
 
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !disparando) {
-      posInicial = GetMousePosition();
+      p1 = GetMousePosition();
       disparando = true;
-    } else if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-      posFinal = GetMousePosition();
-      deltaPos = Vector2Subtract(posInicial, posFinal);
-      Xpos = posInicial.x;
-      Ypos = posInicial.y;
+    }
+    if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
+      pausa = false;
+
+      // TODO: FUNCION PARA CALCULAR TODO ESTO DE MANERA MAS BONITA
+      p2 = GetMousePosition();
+      deltaPos = Vector2Subtract(p1, p2);
+      X_pelota = p1.x;
+      Y_pelota = p1.y;
 
       theta = -atan2f(deltaPos.y, deltaPos.x);
 
-      Vi = sqrt(deltaPos.x * deltaPos.x + deltaPos.y * deltaPos.y);
+      Vi = sqrt(deltaPos.x * deltaPos.x + deltaPos.y * deltaPos.y) / 2;
 
-      if (Vi > 70) {
-        Vi = 70;
+      if (Vi > 150) {
+        Vi = 150;
       }
       ///////////////////////////////////////////////////////////////////////
       // metodo de EULER oilar !!!!!!!!!!!!!!!!!!!!!!!
-      // (REF: https://www.physics.umd.edu/hep/drew/numerical_integration.html)
+      // (REF: https://www.physics.umd.edu/hep/drew/numerical_integration.html )
       //
       // el movimiento de proyectiles es descrito por increibles EDOs...
       //
@@ -77,23 +95,25 @@ int main(void) {
       // x' = Vx = V_x0; CONST
       // y' = Vy = V_x0 - g*dt (y'' = a_y = -g)
       ///////////////////////////////////////////////////////////////////////
-      Vx = Vi * cos(theta) * 15 * GetFrameTime();
-      Vy = (-sin(theta) * Vi * 15 * GetFrameTime()); // Invertimos el signo pues el eje y esta invertido
+      Vx = Vi * cos(theta) * 15 * 0.01;
+      Vy = -sin(theta) * Vi * 15 * 0.01; // Invertimos el signo pues el eje y esta invertido
 
-      printf("%f\n", theta);
       printf("%f\n", Vi);
       disparando = false;
     }
     //----------------------------------------------------------------------------------
-    // Draw
+    // Dibujar
     //----------------------------------------------------------------------------------
     BeginDrawing();
 
     ClearBackground(RAYWHITE);
 
+    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+      DrawLineEx(p1, GetMousePosition(), 10, RED);
+    }
+
     if (!disparando && deltaPos.x != 0 && deltaPos.y != 0) {
-      DrawLineV(posInicial, posFinal, RED);
-      DrawCircle((int)Xpos, (int)Ypos, 20, RED);
+      DrawCircle((int)X_pelota, (int)Y_pelota, 20, RED);
     }
 
     EndDrawing();
