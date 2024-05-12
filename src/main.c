@@ -3,8 +3,9 @@
 #include <math.h>
 #include <stdio.h>
 
-#define REALISTA 0
+#define REALISTA 1
 #define TAMAÑO_RECTANGULOS 80
+#define FF_T 20
 
 void InitV0(float *theta, float *Vi, float *Vy, float *Vx) {
   ///////////////////////////////////////////////////////////////////////
@@ -35,18 +36,19 @@ void Cero(float *x, float *y, float *dx, float *dy) {
 int main(void) {
   // Inicializacion
   //--------------------------------------------------------------------------------------
-  const int anchoPantalla = 2560 + 1;
-  const int alturaPantalla = 1440 + 1;
+  const int anchoPantalla = 1920 + 1;
+  const int alturaPantalla = 1080 + 1;
 
   SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
   InitWindow(anchoPantalla, alturaPantalla, "PAJAROS ENOJONES");
 
+  Rectangle objetivo = {80 * 21, GetScreenHeight() - 80 * 3, 80 * 3, 80 * 3};
   float X_pelota = 0.0; // Posicion de la bola en X
   float Y_pelota = 0.0; // Posicion de la bola en Y
 
 #if REALISTA
-  float Xpos;
-  float Ypos;
+  float Xpos = 0.0;
+  float Ypos = 0.0;
 #endif /* ifdef REALISTA */
 
   float Vy = 0.0; // Velocidad de la pelota en Y
@@ -68,29 +70,32 @@ int main(void) {
     // Update
     //----------------------------------------------------------------------------------
 
-    if (IsKeyDown(KEY_SPACE))
+    if (IsKeyPressed(KEY_SPACE)) {
+
+      printf("Pausa\n");
       pausa = !pausa;
+    }
 
-    if (!disparando) {
-      X_pelota += Vx * GetFrameTime() * 15; // y = y_0 + dt*Vy
-      Y_pelota += Vy * GetFrameTime() * 15; // x = x_0 + dt*Vx_0
+    if (!disparando && !pausa) {
+      X_pelota += Vx * GetFrameTime() * (float)FF_T; // y = y_0 + dt*Vy
+      Y_pelota += Vy * GetFrameTime() * (float)FF_T; // x = x_0 + dt*Vx_0
 
-      Vy += 9.8 * GetFrameTime() * 15; // + y''*dt para Vy
+      Vy += 9.8 * GetFrameTime() * (float)FF_T; // + y''*dt para Vy
 
 #if REALISTA
-      Xpos += Vi * cos(theta) * GetFrameTime() * 15;
-      Ypos = p1.y - ((tan(theta) * Xpos) -
-                     (4.9 * (1 / (Vi * Vi)) * (1 / (cos(theta) * cos(theta))) * (Xpos * Xpos)));
+      Xpos += Vi * cosf(theta) * GetFrameTime() * (float)FF_T;
+      Ypos = p1.y - ((tanf(theta) * Xpos) -
+                     (4.9 * (1 / (Vi * Vi)) * (1 / (cosf(theta) * cosf(theta))) * (Xpos * Xpos)));
 #endif /* ifdef REALISTA */
     }
 
     if (X_pelota > GetScreenWidth() || X_pelota < 0) {
       Cero(&X_pelota, &Y_pelota, &deltaPos.x, &deltaPos.y);
-      pausa = !pausa;
+      disparando = false;
     }
     if (Y_pelota > GetScreenHeight()) {
       Cero(&X_pelota, &Y_pelota, &deltaPos.x, &deltaPos.y);
-      pausa = !pausa;
+      disparando = false;
     }
 
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !disparando) {
@@ -107,16 +112,22 @@ int main(void) {
 
       theta = -atan2f(deltaPos.y, deltaPos.x);
 
-      Vi = sqrt(deltaPos.x * deltaPos.x + deltaPos.y * deltaPos.y) / 2;
+      Vi = sqrtf(deltaPos.x * deltaPos.x + deltaPos.y * deltaPos.y) / 2;
       Vi = (Vi > 150) ? 150 : Vi;
       InitV0(&theta, &Vi, &Vy, &Vx);
 
 #if REALISTA
       Xpos = 0;
-      Ypos = 0;
+      Ypos = p1.y;
 #endif /* ifdef REALISTA */
 
       disparando = false;
+    }
+
+    bool colision = CheckCollisionCircleRec((Vector2){X_pelota, Y_pelota}, 20, objetivo);
+
+    if (colision) {
+      pausa = true;
     }
     //----------------------------------------------------------------------------------
     // Dibujar
@@ -125,6 +136,8 @@ int main(void) {
     DrawFPS(10, 10);
 
     ClearBackground(RAYWHITE);
+
+    DrawRectangleRec(objetivo, GREEN);
 
     for (int i = 0; i < anchoPantalla / TAMAÑO_RECTANGULOS + 1; i++) {
       DrawLineV((Vector2){(float)TAMAÑO_RECTANGULOS * i, 0},
@@ -144,16 +157,17 @@ int main(void) {
       if (f_mouse > 150) {
         f_mouse = 150;
       }
-
       DrawText(TextFormat("[%.2f,%.2f°]", f_mouse, ang_mouse), GetMousePosition().x + 15,
                GetMousePosition().y + 15, 30, RED);
       DrawLineEx(p1, GetMousePosition(), 10, RED);
     }
-
+    if (pausa) {
+      DrawText("PAUSADO", (GetScreenWidth() / 2 - 100), 20, 50, RED);
+    }
     if (!disparando && deltaPos.x != 0 && deltaPos.y != 0) {
-      DrawCircle((int)X_pelota, (int)Y_pelota, 20, RED);
+      DrawCircle((int)X_pelota, (int)Y_pelota, 20, (Color){255, 0, 0, 120});
 #if REALISTA
-      DrawCircle((int)Xpos + p1.x, (int)Ypos, 20, (Color){0, 255, 255, 255});
+      DrawCircle((int)Xpos + p1.x, (int)Ypos, 20, (Color){0, 255, 255, 120});
 #endif /* ifdef REALISTA */
     }
 
