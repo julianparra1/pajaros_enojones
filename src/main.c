@@ -3,7 +3,7 @@
 #include <math.h>
 #include <stdio.h>
 
-#define REALISTA 1
+#define REALISTA 0
 #define TAMAÑO_RECTANGULOS 80
 #define FF_T 20
 
@@ -20,7 +20,7 @@ void InitV0(float *theta, float *Vi, float *Vy, float *Vx) {
   // x' = Vx = V_x0; CONST
   // y' = Vy = V_x0 - g*dt (y'' = a_y = -g)
   ///////////////////////////////////////////////////////////////////////
-  *Vx = *Vi * cosf(*theta);
+  *Vx = cosf(*theta) * *Vi;
   *Vy = -sinf(*theta) * *Vi; // Invertimos el signo pues el eje y esta invertido
 }
 
