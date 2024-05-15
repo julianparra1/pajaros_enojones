@@ -3,7 +3,7 @@
 #include <math.h>
 #include <stdio.h>
 
-#define REALISTA 1
+#define REALISTA 0
 #define TAMAÑO_RECTANGULOS 80
 #define FF_T 20
 
