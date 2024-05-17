@@ -2,64 +2,83 @@
 #include "raymath.h"
 #include <math.h>
 #include <stdio.h>
-
-#define REALISTA 1
+//------------------------------------------------------------------------------------
+// CONSTANTES
+//--------------------------------------------------------------------------------------
+#define REALISTA 0
 #define TAMAÑO_RECTANGULOS 80
 #define FF_T 20
 
-static void RegenTerreno(void);
+//------------------------------------------------------------------------------------
+// Declaracion de funciones
+//--------------------------------------------------------------------------------------
+static void DEBUG_DIBUJOS(void);
+static void RegenerarTerreno(void);
 
-static void InitV0(float *theta, float *Vi, float *Vy, float *Vx);
-static void Cero(float *x, float *y, float *dx, float *dy);
+static void Disparar(void);
+static void ActualizarPelota(void);
+
+static void DibujarCuadricula(void);
+static void DibujarTerreno(void);
+static void DibujarArrastre(void);
+static void DibujarPelota(void);
+
+static void IniciarV(void);
+static void ReiniciarPelota(void);
+
+//------------------------------------------------------------------------------------
+// Structs
+//--------------------------------------------------------------------------------------
 
 typedef struct Terreno {
   Rectangle rectangulo;
   Color color;
 } Terreno;
 
+typedef struct pelota {
+  float x;
+  float y;
+} Pelota;
+
 //------------------------------------------------------------------------------------
-// Pajaros Enojones
-//------------------------------------------------------------------------------------
+// Inicializacion de variables
+//--------------------------------------------------------------------------------------
+static const int anchoPantalla = 1280;
+static const int alturaPantalla = 720;
+
+static Pelota pelota = {0};
+
+#if REALISTA
+static float Xpos = 0.0;
+static float Ypos = 0.0;
+#endif
+
+static float Vy = 0.0; // Velocidad de la pelota en Y
+static float Vx = 0.0; // Velocidad de la pelota en X
+
+static float Vi = 0.0; // Velocidad inicial
+
+static float theta = 0; // Angulo de tiro
+
+static Vector2 p1 = {0, 0};       // Punto Inicial (click)
+static Vector2 p2 = {0, 0};       // Punto final (release del click)
+static Vector2 deltaPos = {0, 0}; // El vector creado por estos dos puntos
+
+static bool pausa = false;      // Pausado?
+static bool disparando = false; // Se presiono click?
 
 static Terreno edificio[32] = {0};
 
 int main(void) {
-  // Inicializacion
-  //--------------------------------------------------------------------------------------
-  const int anchoPantalla = 1280 + 1;
-  const int alturaPantalla = 720 + 1;
-
   SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
   InitWindow(anchoPantalla, alturaPantalla, "PAJAROS ENOJONES");
 
-  Rectangle objetivo = {GetScreenWidth() - TAMAÑO_RECTANGULOS * 3,
-                        GetScreenHeight() - TAMAÑO_RECTANGULOS * 3,
-                        TAMAÑO_RECTANGULOS * 3, TAMAÑO_RECTANGULOS * 3};
-
-  float X_pelota = 0.0; // Posicion de la bola en X
-  float Y_pelota = 0.0; // Posicion de la bola en Y
-
-#if REALISTA
-  float Xpos = 0.0;
-  float Ypos = 0.0;
-#endif /* ifdef REALISTA */
-
-  float Vy = 0.0; // Velocidad de la pelota en Y
-  float Vx = 0.0; // Velocidad de la pelota en X
-
-  float Vi = 0.0; // Velocidad inicial
-
-  float theta = 0; // Angulo de tiro
-
-  Vector2 p1 = {0, 0};       // Punto Inicial (click)
-  Vector2 p2 = {0, 0};       // Punto final (release del click)
-  Vector2 deltaPos = {0, 0}; // El vector creado por estos dos puntos
-
-  bool pausa = false;      // Pausado?
-  bool disparando = false; // Se presiono click?
+  RegenerarTerreno();
   //--------------------------------------------------------------------------------------
   // Juego
+  //--------------------------------------------------------------------------------------
   while (!WindowShouldClose()) {
+    //----------------------------------------------------------------------------------
     // Update
     //----------------------------------------------------------------------------------
     if (IsKeyPressed(KEY_SPACE)) {
@@ -68,29 +87,19 @@ int main(void) {
     }
     if (IsKeyPressed(KEY_R)) {
       printf("Regen\n");
-      RegenTerreno();
+      RegenerarTerreno();
     }
 
     if (!disparando && !pausa) {
-      X_pelota += Vx * GetFrameTime() * (float)FF_T; // y = y_0 + dt*Vy
-      Y_pelota += Vy * GetFrameTime() * (float)FF_T; // x = x_0 + dt*Vx_0
-
-      Vy += 9.8 * GetFrameTime() * (float)FF_T; // + y''*dt para Vy
-
-#if REALISTA
-      Xpos += Vi * cosf(theta) * GetFrameTime() * (float)FF_T;
-      Ypos = p1.y - ((tanf(theta) * Xpos) -
-                     (4.9 * (1 / (Vi * Vi)) *
-                      (1 / (cosf(theta) * cosf(theta))) * (Xpos * Xpos)));
-#endif /* ifdef REALISTA */
+      ActualizarPelota();
     }
 
-    if (X_pelota > GetScreenWidth() || X_pelota < 0) {
-      Cero(&X_pelota, &Y_pelota, &deltaPos.x, &deltaPos.y);
+    if (pelota.x > anchoPantalla || pelota.x < 0) {
+      ReiniciarPelota();
       disparando = false;
     }
-    if (Y_pelota > GetScreenHeight()) {
-      Cero(&X_pelota, &Y_pelota, &deltaPos.x, &deltaPos.y);
+    if (pelota.y > alturaPantalla) {
+      ReiniciarPelota();
       disparando = false;
     }
 
@@ -99,85 +108,35 @@ int main(void) {
       disparando = true;
     }
     if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
-      p2 = GetMousePosition();
-
-      deltaPos = Vector2Subtract(p1, p2);
-
-      X_pelota = p1.x;
-      Y_pelota = p1.y;
-
-      theta = -atan2f(deltaPos.y, deltaPos.x);
-
-      Vi = sqrtf(deltaPos.x * deltaPos.x + deltaPos.y * deltaPos.y) / 2;
-      Vi = (Vi > 150) ? 150 : Vi;
-      InitV0(&theta, &Vi, &Vy, &Vx);
-
-#if REALISTA
-      Xpos = 0;
-      Ypos = p1.y;
-#endif /* ifdef REALISTA */
-
+      Disparar();
       disparando = false;
     }
 
-    bool colision =
-        CheckCollisionCircleRec((Vector2){X_pelota, Y_pelota}, 20, objetivo);
-
-    if (colision) {
-      pausa = true;
-    }
     //----------------------------------------------------------------------------------
     // Dibujar
     //----------------------------------------------------------------------------------
     BeginDrawing();
+
     ClearBackground(RAYWHITE);
-    for (int i = 0; i < 32; i++) {
-      DrawRectangleRec(edificio[i].rectangulo, edificio[i].color);
-    }
 
-    DrawRectangleRec(objetivo, GREEN);
+    DibujarCuadricula();
+    DibujarTerreno();
 
-    for (int i = 0; i < anchoPantalla / TAMAÑO_RECTANGULOS + 1; i++) {
-      DrawLineV((Vector2){(float)TAMAÑO_RECTANGULOS * i, 0},
-                (Vector2){(float)TAMAÑO_RECTANGULOS * i, (float)alturaPantalla},
-                LIGHTGRAY);
-    }
-
-    for (int i = 0; i < alturaPantalla / TAMAÑO_RECTANGULOS + 1; i++) {
-      DrawLineV((Vector2){0, (float)TAMAÑO_RECTANGULOS * i},
-                (Vector2){(float)anchoPantalla, (float)TAMAÑO_RECTANGULOS * i},
-                LIGHTGRAY);
+    if (pausa) {
+      DrawText("PAUSADO", (anchoPantalla / 2 - 100), 20, 50, RED);
     }
 
     if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
-      p2 = GetMousePosition();
-      deltaPos = Vector2Subtract(p1, p2);
-      float f_mouse =
-          sqrt(deltaPos.x * deltaPos.x + deltaPos.y * deltaPos.y) / 2;
-      float ang_mouse = -atan2f(deltaPos.y, deltaPos.x) * RAD2DEG;
-      if (f_mouse > 150) {
-        f_mouse = 150;
-      }
-      DrawText(TextFormat("[%.2f,%.2f°]", f_mouse, ang_mouse),
-               GetMousePosition().x + 15, GetMousePosition().y + 15, 30, RED);
-      DrawLineEx(p1, GetMousePosition(), 10, RED);
+      DibujarArrastre();
     }
-    if (pausa) {
-      DrawText("PAUSADO", (GetScreenWidth() / 2 - 100), 20, 50, RED);
-    }
+
     if (!disparando && deltaPos.x != 0 && deltaPos.y != 0) {
-      DrawCircle((int)X_pelota, (int)Y_pelota, 20, (Color){255, 0, 0, 120});
-#if REALISTA
-      DrawCircle((int)Xpos + p1.x, (int)Ypos, 20, (Color){0, 255, 255, 120});
-#endif /* ifdef REALISTA */
+      DibujarPelota();
     }
-    DrawText(
-        TextFormat("[%.0f,%.0f]", GetMousePosition().x, GetMousePosition().y),
-        GetMousePosition().x + 15, GetMousePosition().y - 15, 30,
-        (Color){0, 255, 255, 250});
+
+    DEBUG_DIBUJOS();
 
     DrawFPS(10, 10);
-
     EndDrawing();
   }
 
@@ -189,7 +148,64 @@ int main(void) {
   return 0;
 }
 
-void RegenTerreno(void) {
+static void DEBUG_DIBUJOS(void) {
+  DrawText(TextFormat("[%.0f,%.0f]", GetMousePosition().x, GetMousePosition().y), GetMousePosition().x + 15,
+           GetMousePosition().y - 15, 30, (Color){0, 255, 255, 250});
+}
+
+static void Disparar(void) {
+  p2 = GetMousePosition();
+
+  deltaPos = Vector2Subtract(p1, p2);
+
+  pelota.x = p1.x;
+  pelota.y = p1.y;
+
+  theta = -atan2f(deltaPos.y, deltaPos.x);
+
+  Vi = sqrtf(deltaPos.x * deltaPos.x + deltaPos.y * deltaPos.y) / 2;
+  Vi = (Vi > 150) ? 150 : Vi;
+
+  IniciarV();
+
+#if REALISTA
+  Xpos = 0;
+  Ypos = p1.y;
+#endif /* ifdef REALISTA */
+}
+
+static void ActualizarPelota(void) {
+  pelota.x += Vx * GetFrameTime() * (float)FF_T; // x = x_0 + dt*Vx_0
+  pelota.y += Vy * GetFrameTime() * (float)FF_T; // y = y_0 + dt*Vy
+
+  Vy += 9.8 * GetFrameTime() * (float)FF_T; // + y''*dt para Vy
+
+#if REALISTA
+  Xpos += Vi * cosf(theta) * GetFrameTime() * (float)FF_T;
+  Ypos = p1.y -
+         ((tanf(theta) * Xpos) - (4.9 * (1 / (Vi * Vi)) * (1 / (cosf(theta) * cosf(theta))) * (Xpos * Xpos)));
+#endif /* ifdef REALISTA */
+}
+
+static void DibujarCuadricula(void) {
+  for (int i = 0; i < anchoPantalla / TAMAÑO_RECTANGULOS + 1; i++) {
+    DrawLineV((Vector2){(float)TAMAÑO_RECTANGULOS * i, 0},
+              (Vector2){(float)TAMAÑO_RECTANGULOS * i, (float)alturaPantalla}, LIGHTGRAY);
+  }
+
+  for (int i = 0; i < alturaPantalla / TAMAÑO_RECTANGULOS + 1; i++) {
+    DrawLineV((Vector2){0, (float)TAMAÑO_RECTANGULOS * i},
+              (Vector2){(float)anchoPantalla, (float)TAMAÑO_RECTANGULOS * i}, LIGHTGRAY);
+  }
+}
+
+static void DibujarTerreno(void) {
+  for (int i = 0; i < 32; i++) {
+    DrawRectangleRec(edificio[i].rectangulo, edificio[i].color);
+  }
+}
+
+static void RegenerarTerreno(void) {
   //////witdh terrain generation
   for (int i = 0; i < 32; i++) {
     edificio[i].rectangulo.x = i * 40;
@@ -199,7 +215,7 @@ void RegenTerreno(void) {
 
   // for first rectangle
   edificio[0].rectangulo.height = GetRandomValue(200, 700);
-  edificio[0].rectangulo.y = GetScreenHeight() - edificio[0].rectangulo.height;
+  edificio[0].rectangulo.y = alturaPantalla - edificio[0].rectangulo.height;
 
   /////height terrain generation
   // if odd substract height from the previous rectangle
@@ -207,20 +223,36 @@ void RegenTerreno(void) {
   for (int i = 1; i < 32; i++) {
     int moneda = GetRandomValue(0, 1);
     if (moneda == 1) {
-      edificio[i].rectangulo.height =
-          edificio[i - 1].rectangulo.height - (float)40;
-      edificio[i].rectangulo.y =
-          GetScreenHeight() - edificio[i].rectangulo.height;
+      edificio[i].rectangulo.height = edificio[i - 1].rectangulo.height - (float)40;
+      edificio[i].rectangulo.y = alturaPantalla - edificio[i].rectangulo.height;
     } else {
-      edificio[i].rectangulo.height =
-          edificio[i - 1].rectangulo.height + (float)40;
-      edificio[i].rectangulo.y =
-          GetScreenHeight() - edificio[i].rectangulo.height;
+      edificio[i].rectangulo.height = edificio[i - 1].rectangulo.height + (float)40;
+      edificio[i].rectangulo.y = alturaPantalla - edificio[i].rectangulo.height;
     }
   }
 }
 
-static void InitV0(float *theta, float *Vi, float *Vy, float *Vx) {
+static void DibujarArrastre(void) {
+  p2 = GetMousePosition();
+  deltaPos = Vector2Subtract(p1, p2);
+  float f_mouse = sqrt(deltaPos.x * deltaPos.x + deltaPos.y * deltaPos.y) / 2;
+  float ang_mouse = -atan2f(deltaPos.y, deltaPos.x) * RAD2DEG;
+  if (f_mouse > 150) {
+    f_mouse = 150;
+  }
+  DrawText(TextFormat("[%.2f,%.2f°]", f_mouse, ang_mouse), GetMousePosition().x + 15,
+           GetMousePosition().y + 15, 30, RED);
+  DrawLineEx(p1, GetMousePosition(), 10, RED);
+}
+
+static void DibujarPelota(void) {
+  DrawCircle((int)pelota.x, (int)pelota.y, 20, (Color){255, 0, 0, 120});
+#if REALISTA
+  DrawCircle((int)Xpos + p1.x, (int)Ypos, 20, (Color){0, 255, 255, 120});
+#endif /* ifdef REALISTA */
+}
+
+static void IniciarV(void) {
   ///////////////////////////////////////////////////////////////////////
   // metodo de EULER oilar !!!!!!!!!!!!!!!!!!!!!!!
   // (REF: https://www.physics.umd.edu/hep/drew/numerical_integration.html )
@@ -233,13 +265,14 @@ static void InitV0(float *theta, float *Vi, float *Vy, float *Vx) {
   // x' = Vx = V_x0; CONST
   // y' = Vy = V_x0 - g*dt (y'' = a_y = -g)
   ///////////////////////////////////////////////////////////////////////
-  *Vx = *Vi * cosf(*theta);
-  *Vy = -sinf(*theta) * *Vi; // Invertimos el signo pues el eje y esta invertido
+  Vx = Vi * cosf(theta);
+  Vy = -sinf(theta) * Vi; // Invertimos el signo pues el eje y esta invertido
 }
 
-static void Cero(float *x, float *y, float *dx, float *dy) {
-  *x = 0;
-  *y = 0;
-  *dx = 0;
-  *dy = 0;
+static void ReiniciarPelota(void) {
+  pelota.x = 0;
+  pelota.y = 0;
+
+  deltaPos.x = 0;
+  deltaPos.y = 0;
 }
