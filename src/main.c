@@ -7,7 +7,6 @@
 #define TAMAÑO_RECTANGULOS 80
 #define FF_T 20
 
-<<<<<<< HEAD
 static void RegenTerreno(void);
 
 static void InitV0(float *theta, float *Vi, float *Vy, float *Vx);
@@ -17,24 +16,6 @@ typedef struct Terreno {
   Rectangle rectangulo;
   Color color;
 } Terreno;
-=======
-void InitV0(float *theta, float *Vi, float *Vy, float *Vx) {
-  ///////////////////////////////////////////////////////////////////////
-  // metodo de EULER oilar !!!!!!!!!!!!!!!!!!!!!!!
-  // (REF: https://www.physics.umd.edu/hep/drew/numerical_integration.html )
-  //
-  // el movimiento de proyectiles es descrito por increibles EDOs...
-  //
-  // y'(0) = V_y0 = v_0sin(theta)
-  // x'(0) = V_x0 = v_0cos(theta)
-  //
-  // x' = Vx = V_x0; CONST
-  // y' = Vy = V_x0 - g*dt (y'' = a_y = -g)
-  ///////////////////////////////////////////////////////////////////////
-  *Vx = cosf(*theta) * *Vi;
-  *Vy = -sinf(*theta) * *Vi; // Invertimos el signo pues el eje y esta invertido
-}
->>>>>>> 1472365a3edcfad304a594ba7b0da2332c0dbd09
 
 //------------------------------------------------------------------------------------
 // Pajaros Enojones
