@@ -7,42 +7,35 @@
 #define TAMAÑO_RECTANGULOS 80
 #define FF_T 20
 
-void InitV0(float *theta, float *Vi, float *Vy, float *Vx) {
-  ///////////////////////////////////////////////////////////////////////
-  // metodo de EULER oilar !!!!!!!!!!!!!!!!!!!!!!!
-  // (REF: https://www.physics.umd.edu/hep/drew/numerical_integration.html )
-  //
-  // el movimiento de proyectiles es descrito por increibles EDOs...
-  //
-  // y'(0) = V_y0 = v_0sin(theta)
-  // x'(0) = V_x0 = v_0cos(theta)
-  //
-  // x' = Vx = V_x0; CONST
-  // y' = Vy = V_x0 - g*dt (y'' = a_y = -g)
-  ///////////////////////////////////////////////////////////////////////
-  *Vx = *Vi * cosf(*theta);
-  *Vy = -sinf(*theta) * *Vi; // Invertimos el signo pues el eje y esta invertido
-}
+static void RegenTerreno(void);
 
-void Cero(float *x, float *y, float *dx, float *dy) {
-  *x = 0;
-  *y = 0;
-  *dx = 0;
-  *dy = 0;
-}
+static void InitV0(float *theta, float *Vi, float *Vy, float *Vx);
+static void Cero(float *x, float *y, float *dx, float *dy);
+
+typedef struct Terreno {
+  Rectangle rectangulo;
+  Color color;
+} Terreno;
+
 //------------------------------------------------------------------------------------
 // Pajaros Enojones
 //------------------------------------------------------------------------------------
+
+static Terreno edificio[32] = {0};
+
 int main(void) {
   // Inicializacion
   //--------------------------------------------------------------------------------------
-  const int anchoPantalla = 1920 + 1;
-  const int alturaPantalla = 1080 + 1;
+  const int anchoPantalla = 1280 + 1;
+  const int alturaPantalla = 720 + 1;
 
   SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
   InitWindow(anchoPantalla, alturaPantalla, "PAJAROS ENOJONES");
 
-  Rectangle objetivo = {80 * 21, GetScreenHeight() - 80 * 3, 80 * 3, 80 * 3};
+  Rectangle objetivo = {GetScreenWidth() - TAMAÑO_RECTANGULOS * 3,
+                        GetScreenHeight() - TAMAÑO_RECTANGULOS * 3,
+                        TAMAÑO_RECTANGULOS * 3, TAMAÑO_RECTANGULOS * 3};
+
   float X_pelota = 0.0; // Posicion de la bola en X
   float Y_pelota = 0.0; // Posicion de la bola en Y
 
@@ -69,11 +62,13 @@ int main(void) {
   while (!WindowShouldClose()) {
     // Update
     //----------------------------------------------------------------------------------
-
     if (IsKeyPressed(KEY_SPACE)) {
-
       printf("Pausa\n");
       pausa = !pausa;
+    }
+    if (IsKeyPressed(KEY_R)) {
+      printf("Regen\n");
+      RegenTerreno();
     }
 
     if (!disparando && !pausa) {
@@ -85,7 +80,8 @@ int main(void) {
 #if REALISTA
       Xpos += Vi * cosf(theta) * GetFrameTime() * (float)FF_T;
       Ypos = p1.y - ((tanf(theta) * Xpos) -
-                     (4.9 * (1 / (Vi * Vi)) * (1 / (cosf(theta) * cosf(theta))) * (Xpos * Xpos)));
+                     (4.9 * (1 / (Vi * Vi)) *
+                      (1 / (cosf(theta) * cosf(theta))) * (Xpos * Xpos)));
 #endif /* ifdef REALISTA */
     }
 
@@ -124,7 +120,8 @@ int main(void) {
       disparando = false;
     }
 
-    bool colision = CheckCollisionCircleRec((Vector2){X_pelota, Y_pelota}, 20, objetivo);
+    bool colision =
+        CheckCollisionCircleRec((Vector2){X_pelota, Y_pelota}, 20, objetivo);
 
     if (colision) {
       pausa = true;
@@ -133,32 +130,36 @@ int main(void) {
     // Dibujar
     //----------------------------------------------------------------------------------
     BeginDrawing();
-    DrawFPS(10, 10);
-
     ClearBackground(RAYWHITE);
+    for (int i = 0; i < 32; i++) {
+      DrawRectangleRec(edificio[i].rectangulo, edificio[i].color);
+    }
 
     DrawRectangleRec(objetivo, GREEN);
 
     for (int i = 0; i < anchoPantalla / TAMAÑO_RECTANGULOS + 1; i++) {
       DrawLineV((Vector2){(float)TAMAÑO_RECTANGULOS * i, 0},
-                (Vector2){(float)TAMAÑO_RECTANGULOS * i, (float)alturaPantalla}, LIGHTGRAY);
+                (Vector2){(float)TAMAÑO_RECTANGULOS * i, (float)alturaPantalla},
+                LIGHTGRAY);
     }
 
     for (int i = 0; i < alturaPantalla / TAMAÑO_RECTANGULOS + 1; i++) {
       DrawLineV((Vector2){0, (float)TAMAÑO_RECTANGULOS * i},
-                (Vector2){(float)anchoPantalla, (float)TAMAÑO_RECTANGULOS * i}, LIGHTGRAY);
+                (Vector2){(float)anchoPantalla, (float)TAMAÑO_RECTANGULOS * i},
+                LIGHTGRAY);
     }
 
     if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
       p2 = GetMousePosition();
       deltaPos = Vector2Subtract(p1, p2);
-      float f_mouse = sqrt(deltaPos.x * deltaPos.x + deltaPos.y * deltaPos.y) / 2;
+      float f_mouse =
+          sqrt(deltaPos.x * deltaPos.x + deltaPos.y * deltaPos.y) / 2;
       float ang_mouse = -atan2f(deltaPos.y, deltaPos.x) * RAD2DEG;
       if (f_mouse > 150) {
         f_mouse = 150;
       }
-      DrawText(TextFormat("[%.2f,%.2f°]", f_mouse, ang_mouse), GetMousePosition().x + 15,
-               GetMousePosition().y + 15, 30, RED);
+      DrawText(TextFormat("[%.2f,%.2f°]", f_mouse, ang_mouse),
+               GetMousePosition().x + 15, GetMousePosition().y + 15, 30, RED);
       DrawLineEx(p1, GetMousePosition(), 10, RED);
     }
     if (pausa) {
@@ -170,6 +171,12 @@ int main(void) {
       DrawCircle((int)Xpos + p1.x, (int)Ypos, 20, (Color){0, 255, 255, 120});
 #endif /* ifdef REALISTA */
     }
+    DrawText(
+        TextFormat("[%.0f,%.0f]", GetMousePosition().x, GetMousePosition().y),
+        GetMousePosition().x + 15, GetMousePosition().y - 15, 30,
+        (Color){0, 255, 255, 250});
+
+    DrawFPS(10, 10);
 
     EndDrawing();
   }
@@ -180,4 +187,59 @@ int main(void) {
   //--------------------------------------------------------------------------------------
 
   return 0;
+}
+
+void RegenTerreno(void) {
+  //////witdh terrain generation
+  for (int i = 0; i < 32; i++) {
+    edificio[i].rectangulo.x = i * 40;
+    edificio[i].rectangulo.width = 40;
+    edificio[i].color = (Color){1, 1, 1, 255};
+  }
+
+  // for first rectangle
+  edificio[0].rectangulo.height = GetRandomValue(200, 700);
+  edificio[0].rectangulo.y = GetScreenHeight() - edificio[0].rectangulo.height;
+
+  /////height terrain generation
+  // if odd substract height from the previous rectangle
+  // if even add height from previous rectangle
+  for (int i = 1; i < 32; i++) {
+    int moneda = GetRandomValue(0, 1);
+    if (moneda == 1) {
+      edificio[i].rectangulo.height =
+          edificio[i - 1].rectangulo.height - (float)40;
+      edificio[i].rectangulo.y =
+          GetScreenHeight() - edificio[i].rectangulo.height;
+    } else {
+      edificio[i].rectangulo.height =
+          edificio[i - 1].rectangulo.height + (float)40;
+      edificio[i].rectangulo.y =
+          GetScreenHeight() - edificio[i].rectangulo.height;
+    }
+  }
+}
+
+static void InitV0(float *theta, float *Vi, float *Vy, float *Vx) {
+  ///////////////////////////////////////////////////////////////////////
+  // metodo de EULER oilar !!!!!!!!!!!!!!!!!!!!!!!
+  // (REF: https://www.physics.umd.edu/hep/drew/numerical_integration.html )
+  //
+  // el movimiento de proyectiles es descrito por increibles EDOs...
+  //
+  // y'(0) = V_y0 = v_0sin(theta)
+  // x'(0) = V_x0 = v_0cos(theta)
+  //
+  // x' = Vx = V_x0; CONST
+  // y' = Vy = V_x0 - g*dt (y'' = a_y = -g)
+  ///////////////////////////////////////////////////////////////////////
+  *Vx = *Vi * cosf(*theta);
+  *Vy = -sinf(*theta) * *Vi; // Invertimos el signo pues el eje y esta invertido
+}
+
+static void Cero(float *x, float *y, float *dx, float *dy) {
+  *x = 0;
+  *y = 0;
+  *dx = 0;
+  *dy = 0;
 }
