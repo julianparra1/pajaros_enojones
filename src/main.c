@@ -8,9 +8,10 @@
 #define REALISTA 0
 #define TAMAÑO_RECTANGULOS 80
 #define FF_T 20
-#define GRAV 9
+#define GRAV 8
 #define CAMBIO_ALTURA 50
-#define MAX_VI 100
+#define MAX_VI 120
+#define DIV_POTENCIA 2
 #define CYAN                                                                   \
   CLITERAL(Color) { 0, 255, 255, 255 }
 //------------------------------------------------------------------------------------
@@ -221,7 +222,7 @@ static void Disparar(void) {
   pelota.pos = p1;
 
   theta = -atan2f(deltaPos.y, deltaPos.x);
-  Vi = sqrtf(deltaPos.x * deltaPos.x + deltaPos.y * deltaPos.y) / 2;
+  Vi = sqrtf(deltaPos.x * deltaPos.x + deltaPos.y * deltaPos.y) / DIV_POTENCIA;
   Vi = (Vi > MAX_VI) ? MAX_VI : Vi;
 
   ///////////////////////////////////////////////////////////////////////
@@ -336,7 +337,8 @@ static void RegenerarTerreno(void) {
 static void DibujarArrastre(void) {
   p2 = GetMousePosition();
   deltaPos = Vector2Subtract(p1, p2);
-  float f_mouse = sqrt(deltaPos.x * deltaPos.x + deltaPos.y * deltaPos.y) / 2;
+  float f_mouse =
+      sqrt(deltaPos.x * deltaPos.x + deltaPos.y * deltaPos.y) / DIV_POTENCIA;
   float ang_mouse = -atan2f(deltaPos.y, deltaPos.x) * RAD2DEG;
   if (f_mouse > MAX_VI) {
     f_mouse = MAX_VI;
