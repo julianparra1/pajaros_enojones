@@ -8,13 +8,17 @@
 #define REALISTA 0
 #define TAMAÑO_RECTANGULOS 80
 #define FF_T 20
-#define CAMBIO_ALTURA 60
+#define GRAV 9
+#define CAMBIO_ALTURA 50
 #define MAX_VI 100
+#define CYAN                                                                   \
+  CLITERAL(Color) { 0, 255, 255, 255 }
 //------------------------------------------------------------------------------------
 // Declaracion de funciones
 //--------------------------------------------------------------------------------------
 static void DEBUG_DIBUJOS(void);
 static void RegenerarTerreno(void);
+static void RegenerarJugadores(void);
 
 static void Disparar(void);
 static void ActualizarPelota(void);
@@ -23,6 +27,7 @@ static void DibujarCuadricula(void);
 static void DibujarTerreno(void);
 static void DibujarArrastre(void);
 static void DibujarPelota(void);
+static void DibujarJugadores(void);
 
 static void Explosion(int a);
 
@@ -36,6 +41,12 @@ typedef struct Terreno {
   Color color;
 } Terreno;
 
+typedef struct Jugador {
+  int nRec;
+  Rectangle rectangulo;
+  Color color;
+} Jugador;
+
 typedef struct Pelota {
   Vector2 pos;
 } Pelota;
@@ -47,11 +58,12 @@ static const int anchoPantalla = 1280;
 static const int alturaPantalla = 720;
 
 static Pelota pelota = {0};
-
+static Jugador jugadores[2] = {0};
 #if REALISTA
 static float Xpos = 0.0;
 static float Ypos = 0.0;
 #endif
+static int turno;
 
 static float Vy = 0.0; // Velocidad de la pelota en Y
 static float Vx = 0.0; // Velocidad de la pelota en X
@@ -66,10 +78,12 @@ static Vector2 deltaPos = {0, 0}; // El vector creado por estos dos puntos
 
 static bool pausa = false;      // Pausado?
 static bool disparando = false; // Se presiono click?
-
+static bool victoria = false;
 static Terreno edificio[32] = {0};
 
 int main(void) {
+  jugadores[0].color = CYAN;
+  jugadores[1].color = RED;
 
   SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
   InitWindow(anchoPantalla, alturaPantalla, "PAJAROS ENOJONES");
@@ -77,6 +91,8 @@ int main(void) {
   // EFECTOS
   Sound boom = LoadSound("resources/boom.wav");
   RegenerarTerreno();
+  RegenerarJugadores();
+
   //--------------------------------------------------------------------------------------
   // Juego
   //--------------------------------------------------------------------------------------
@@ -91,6 +107,8 @@ int main(void) {
     if (IsKeyPressed(KEY_R)) {
       printf("Regen\n");
       RegenerarTerreno();
+      RegenerarJugadores();
+      victoria = false;
     }
 
     if (disparando && !pausa) {
@@ -102,19 +120,38 @@ int main(void) {
           Explosion(i);
           PlaySound(boom);
           ReiniciarPelota();
+          turno = (turno == 0) ? 1 : 0;
+        }
+      }
+
+      for (int i = 0; i < 2; i++) {
+        bool colision =
+            CheckCollisionCircleRec(pelota.pos, 20, jugadores[i].rectangulo);
+        if (colision && turno != i) {
+          ReiniciarPelota();
+          victoria = true;
         }
       }
     }
 
     if (pelota.pos.x > anchoPantalla || pelota.pos.x < 0) {
       ReiniciarPelota();
+      turno = (turno == 0) ? 1 : 0;
     }
     if (pelota.pos.y > alturaPantalla) {
       ReiniciarPelota();
+      turno = (turno == 0) ? 1 : 0;
     }
 
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-      p1 = GetMousePosition();
+      if (turno == 0) {
+        p1 = (Vector2){jugadores[0].rectangulo.x + 20,
+                       jugadores[0].rectangulo.y - 20};
+      } else {
+
+        p1 = (Vector2){jugadores[1].rectangulo.x + 20,
+                       jugadores[1].rectangulo.y - 20};
+      }
     }
     if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
       Disparar();
@@ -134,15 +171,20 @@ int main(void) {
       DrawText("PAUSADO", (anchoPantalla / 2 - 100), 20, 50, RED);
     }
 
-    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
-      DibujarArrastre();
+    if (victoria) {
+      DrawText(TextFormat("GANA EL JUGADOR %d!", turno + 1),
+               (anchoPantalla / 2 - 250), (alturaPantalla / 2 - 60), 50, GOLD);
     }
+
+    DrawText(TextFormat("Jugador %d dispara", turno + 1), 10, 30, 20, BLACK);
 
     if (disparando && deltaPos.x != 0 && deltaPos.y != 0) {
       DibujarPelota();
     }
-
-    DEBUG_DIBUJOS();
+    DibujarJugadores();
+    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+      DibujarArrastre();
+    }
 
     DrawFPS(10, 10);
     EndDrawing();
@@ -161,8 +203,7 @@ int main(void) {
 static void DEBUG_DIBUJOS(void) {
   DrawText(
       TextFormat("[%.0f,%.0f]", GetMousePosition().x, GetMousePosition().y),
-      GetMousePosition().x + 15, GetMousePosition().y - 15, 30,
-      (Color){0, 255, 255, 250});
+      GetMousePosition().x + 15, GetMousePosition().y - 15, 30, CYAN);
 }
 
 static void Disparar(void) {
@@ -206,15 +247,26 @@ static void Disparar(void) {
 #endif /* ifdef REALISTA */
 }
 
+static void RegenerarJugadores(void) {
+  jugadores[0].nRec = GetRandomValue(2, 8);
+  jugadores[1].nRec = GetRandomValue(24, 30);
+  for (int i = 0; i < 2; i++) {
+    jugadores[i].rectangulo.x = edificio[jugadores[i].nRec].rectangulo.x;
+    jugadores[i].rectangulo.width = 40;
+    jugadores[i].rectangulo.y = edificio[jugadores[i].nRec].rectangulo.y - 40;
+    jugadores[i].rectangulo.height = 40;
+  }
+}
+
 static void ActualizarPelota(void) {
   pelota.pos.x += Vx * GetFrameTime() * (float)FF_T; // x = x_0 + dt*Vx_0
   pelota.pos.y += Vy * GetFrameTime() * (float)FF_T; // y = y_0 + dt*Vy
-  Vy += 9.8 * GetFrameTime() * (float)FF_T;          // + y''*dt para Vy
+  Vy += GRAV * GetFrameTime() * (float)FF_T;         // + y''*dt para Vy
 #if REALISTA
   Xpos += Vi * cosf(theta) * GetFrameTime() * (float)FF_T;
   Ypos = p1.y - ((tanf(theta) * Xpos) -
-                 (4.9 * (1 / (Vi * Vi)) * (1 / (cosf(theta) * cosf(theta))) *
-                  (Xpos * Xpos)));
+                 ((GRAV / 2) * (1 / (Vi * Vi)) *
+                  (1 / (cosf(theta) * cosf(theta))) * (Xpos * Xpos)));
 #endif /* ifdef REALISTA */
 }
 
@@ -236,6 +288,10 @@ static void DibujarTerreno(void) {
   for (int i = 0; i < 32; i++) {
     DrawRectangleRec(edificio[i].rectangulo, edificio[i].color);
   }
+}
+static void DibujarJugadores(void) {
+  DrawRectangleRec(jugadores[0].rectangulo, jugadores[0].color);
+  DrawRectangleRec(jugadores[1].rectangulo, jugadores[1].color);
 }
 
 static void RegenerarTerreno(void) {
@@ -285,9 +341,10 @@ static void DibujarArrastre(void) {
   if (f_mouse > MAX_VI) {
     f_mouse = MAX_VI;
   }
-  DrawText(TextFormat("[%.2f,%.2f°]", f_mouse, ang_mouse),
-           GetMousePosition().x + 15, GetMousePosition().y + 15, 30, RED);
-  DrawLineEx(p1, GetMousePosition(), 10, RED);
+
+  DrawText(TextFormat("[%.2f,%.2f°]", f_mouse, ang_mouse), p1.x - 50, p1.y - 20,
+           20, RED);
+  DrawLineEx(p1, GetMousePosition(), 2, RED);
 }
 
 static void DibujarPelota(void) {
@@ -298,16 +355,19 @@ static void DibujarPelota(void) {
 }
 
 static void Explosion(int a) {
-  if (a >= 1) {
+  if (a != jugadores[0].nRec && a != jugadores[1].nRec) {
+    edificio[a].rectangulo.y += 50;
+    edificio[a].rectangulo.height -= 50;
+  }
+  if (a >= 1 && (a - 1) != jugadores[0].nRec && (a - 1) != jugadores[1].nRec) {
     edificio[a - 1].rectangulo.y += 25;
     edificio[a - 1].rectangulo.height -= 25;
   }
 
-  edificio[a].rectangulo.y += 50;
-  edificio[a].rectangulo.height -= 50;
-
-  edificio[a + 1].rectangulo.y += 25;
-  edificio[a + 1].rectangulo.height -= 25;
+  if (a <= 31 && (a + 1) != jugadores[0].nRec && (a + 1) != jugadores[1].nRec) {
+    edificio[a + 1].rectangulo.y += 25;
+    edificio[a + 1].rectangulo.height -= 25;
+  }
 }
 
 static void ReiniciarPelota(void) {
