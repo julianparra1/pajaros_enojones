@@ -8,6 +8,10 @@ CC = gcc
 FLAGS = -std=c99 -Wall -Wno-missing-braces -Wunused-result -D_DEFAULT_SOURCE
 CFLAGS += -s -O2
 
+ifeq ($(OS),Windows_NT)
+	CYAN := TRUE
+endif
+
 ifeq ($(CYAN),TRUE)
 	LDLIBS 	= -I ./libs/raylib-mingw64/include/ -L ./libs/raylib-mingw64/lib/
 	LDLIBS += -lraylib -lopengl32 -lgdi32 -lwinmm
