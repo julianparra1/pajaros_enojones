@@ -5,7 +5,7 @@ NOMBRE = PAJAROS_ENOJONES
 EXT = -linux64.out
 
 CC = gcc
-CFLAGS = -std=c99 -Wall -Wno-missing-braces -Wunused-result -D_DEFAULT_SOURCE
+FLAGS = -std=c99 -Wall -Wno-missing-braces -Wunused-result -D_DEFAULT_SOURCE
 CFLAGS += -s -O2
 
 ifeq ($(CYAN),TRUE)
