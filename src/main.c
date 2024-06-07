@@ -104,7 +104,7 @@ static Rectangle cajaTexto = {(anchoPantalla - 250) / 2.0f, (alturaPantalla / 2.
 static bool iniciando = true;
 
 // Puntaje calculado segun el tiempo que se tarda en terminar la partida
-static int puntaje = 0;
+static int puntaje = 500;
 int main(void) {
 
     // INICIALIZAR JUGADORES
@@ -252,7 +252,7 @@ int main(void) {
             int key = GetCharPressed();
             while (key > 0) {
                 // Solo permitimos caracteres de A-z y especiales
-                if ((key >= 65) && (key <= 122) && (contadorLetras < 10)) {
+                if ((key >= 33) && (key <= 122) && (contadorLetras < 10)) {
                     jugadores[turno].nombre[contadorLetras] = (char)key;
                     jugadores[turno].nombre[contadorLetras + 1] = '\0';
                     contadorLetras++;
@@ -274,6 +274,7 @@ int main(void) {
                     turno = 1;
                 } else if (contadorLetras > 0 && turno == 1) {
                     iniciando = false;
+                    tiempoInicial = GetTime();
                     turno = GetRandomValue(0, 1);
                     punto1Arrastre =
                         (Vector2){jugadores[turno].rectangulo.x + 20, jugadores[turno].rectangulo.y - 20};
@@ -345,7 +346,6 @@ int main(void) {
     CloseAudioDevice();
     CloseWindow(); // Close window and OpenGL context
     //--------------------------------------------------------------------------------------
-
     return 0;
 }
 
@@ -689,7 +689,7 @@ static void GuardarPuntaje(void) {
             // Shifteamos hacia abajo todo el leaderboard
             for (int j = 9; j > i; j--) {
                 strncpy(lb[j].nombre, lb[j - 1].nombre, 10);
-                lb[j].puntuacion = lb[j].puntuacion;
+                lb[j].puntuacion = lb[j - 1].puntuacion;
             }
             // Guardamos el nuevo puntaje
             strncpy(lb[i].nombre, jugadores[turno].nombre, 10);
